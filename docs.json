@@ -10,7 +10,7 @@
     "openapi": "openapi.json",
     "playground": {
       "display": "interactive",
-      "proxy": false
+      "proxy": true
     },
     "examples": {
       "languages": [
@@ -54,7 +54,8 @@
             "group": "Sandbox demonstration",
             "pages": [
               "index",
-              "quickstart"
+              "quickstart",
+              "test-beneficiaries"
             ]
           }
         ]
@@ -64,10 +65,9 @@
         "openapi": "/openapi.json",
         "groups": [
           {
-            "group": "1. Authenticate",
+            "group": "1. Start demo",
             "pages": [
-              "GET /auth",
-              "POST /auth"
+              "POST /sandbox/auth"
             ]
           },
           {
@@ -78,16 +78,29 @@
             ]
           },
           {
-            "group": "3. Get a firm quote",
+            "group": "3. Get a quote",
             "pages": [
               "POST /sep38/quote"
             ]
           },
           {
-            "group": "4. Create and track payment",
+            "group": "4. Create payment",
             "pages": [
-              "POST /sep31/transactions",
+              "POST /sep31/transactions"
+            ]
+          },
+          {
+            "group": "5. Fund and track",
+            "pages": [
+              "POST /sandbox/payments/{id}/fund",
               "GET /sep31/transactions/{id}"
+            ]
+          },
+          {
+            "group": "Standard authentication",
+            "pages": [
+              "GET /auth",
+              "POST /auth"
             ]
           },
           {

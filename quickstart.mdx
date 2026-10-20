@@ -1,109 +1,125 @@
 ---
 title: "Run a payment"
-description: "Follow these steps in order: authenticate, register customers, quote, pay and track."
+description: "Choose a receiver, choose an amount, and follow the payment to completion."
 ---
 
-<Info>Operator-led sandbox: 0.2 Testnet USDC funds a 100 virtual XOF payout to synthetic Amina Diop. No real money moves. The presenter must keep the local services and tunnel running.</Info>
+This walkthrough uses Stellar Testnet and PI-SPI sandbox. Use the [test beneficiaries](/test-beneficiaries). No real money is involved.
 
-## Start here: which account do I use?
+<Tip>
+  Everything runs in this site's **Try it** playground. No wallet, terminal, installation or local helper is needed. The API is hosted at `https://sandbox-api.nostro.finance`.
 
-| Field | What it identifies | Use it for |
+  Choose request examples from the dropdown beside **cURL** (for example, **Sender** or **BankQuote**). This fills the request fields. Replace any `<...>` placeholders with values from your own responses.
+
+  After **Send**, wait for the live response panel at the top right to show a status such as **200 OK**, **201 Created** or **202 Accepted**. Copy IDs and tokens from that panel. The response examples below it are illustrations, not the result of your request. Save the sender ID before submitting the receiver on the same page.
+
+  Paste only the token into the Bearer field, without adding the word `Bearer`. Mintlify may keep it between pages; replace it if you start a new session.
+</Tip>
+
+## 1. Start a session
+
+Open [Start a sandbox session](/api-reference/sandbox/start-a-sandbox-session?playground=open) and click **Send**. No body is needed.
+
+Save these two values:
+
+- **token**: paste it into the Bearer field on the following pages.
+- **account**: the sending partner's Stellar public key. Use it when registering both customers.
+
+## 2. Register the sender and receiver
+
+Open [Register a customer](/api-reference/customers/register-a-customer?playground=open). First select **Sender**, paste your session `account`, and send. Save its `id` as **sender_id**.
+
+Then select **BankReceiver** or **WalletReceiver**, use the same session `account`, and send. Save this `id` as **receiver_id**.
+
+The **sender** is the person sending money. The **receiver** owns the destination bank account or wallet. Our Anchor integration requires both customer IDs, regardless of the destination type. The partner’s Stellar `account` identifies the API caller; it is not either person’s bank account.
+
+|  | Bank account | Mobile money |
 | --- | --- | --- |
-| `account` | Sending partner’s Stellar public key | Authentication and SEP-12 customer registration |
-| `receiver_id` | Beneficiary customer registered with Nostro | Choosing who receives the payout |
-| Beneficiary alias | Destination account reference resolved through PI-SPI | Nostro’s off-chain payout; preconfigured for this demo |
+| Name | Amina Diop | Lamine Tall |
+| Institution | `BIMAO_SANDBOX` | `PI_SPI_EME_CI_SANDBOX` |
+| Destination | Account `31432` | Number `+2250700000000` |
+| Quote method | `bank_account` | `mobile_money` |
 
-For `account`, copy this **public** test key:
+You can [read customer status](/api-reference/customers/read-customer-requirements-or-status?playground=open) with each returned ID. Both must be `ACCEPTED`.
 
-```text
-GCZN3RM3P3M3NZH5OS6DHVXZIOGMTW4CIORHBVMRLSA3JASUHKSE4DKI
+## 3. Choose an amount and get a quote
+
+Open [Get a payment quote](/api-reference/quotes/get-a-payment-quote?playground=open). Select **BankQuote** or **WalletQuote** to match your receiver.
+
+Change **sell_amount** to the USDC amount you want to send. For example:
+
+| USDC sent | XOF received |
+| --- | --- |
+| `0.2` | `100` |
+| `1` | `500` |
+| `2` | `1000` |
+| `5` | `2500` |
+
+The minimum is **100 XOF**, the maximum is **2,500 XOF**, and the receiver must get whole XOF. You can instead provide `buy_amount` in XOF; remove `sell_amount` first. Never provide both.
+
+Save the quote **id** and **sell_amount**. The quote is valid for ten minutes.
+
+### What the quote fields mean
+
+- **sell_asset**: the currency you send—USDC.
+- **buy_asset**: the currency the receiver gets—XOF.
+- **price**: the exchange rate before fees. `0.002` means **0.002 USDC for one XOF**, which is **500 XOF per USDC**.
+- **fee.total**: the service charge. It is `0` here.
+- **fee.asset**: the currency used for the service charge.
+- **total_price**: the exchange rate including fees. It equals `price` here because the fee is zero.
+
+The Stellar network fee is separate; the sandbox sponsor pays it.
+
+### Why is the USDC identifier so long?
+
+Stellar's quote standard uses `stellar:<currency>:<issuer>`. The issuer distinguishes the intended USDC asset from other assets with the same name. Keep the prefilled value:
+
+```json
+"sell_asset": "stellar:USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 ```
 
-It is not a bank account number. Knowing the public key does not authorize payments: the corresponding private key must sign the authentication challenge locally. The same partner account is used when registering both customers.
-
-## 1. Authenticate once
-
-[GET /auth — request a challenge](/api-reference/authentication/request-an-authentication-challenge): enter the public key above in `account`. Leave optional fields empty for this demo.
-
-Then validate and sign the returned `transaction` with the partner wallet. [POST /auth — obtain a token](/api-reference/authentication/exchange-a-signed-challenge-for-a-token) accepts that **signed transaction**, not the public key again. Copy its `token` into the Bearer field for the remaining calls. Never paste a private key into Mintlify.
-
-**Presenter shortcut:** the configured local helper performs both API calls and signing:
-
-```sh
-node scripts/demo-payment.js --auth-only
-```
-
-Copy the token from `.local/sep10-token.txt`. Mintlify itself cannot sign a wallet challenge. This demo is presenter-assisted, not anonymous self-service.
-
-## 2. Register sender and beneficiary
-
-[PUT /sep12/customer — register a customer](/api-reference/customers/register-or-update-a-synthetic-customer):
-
-1. Send the **Sender** example. Save the returned `id` as `sender_id`.
-2. Send the **Receiver** example for **Amina Diop**. Save its `id` as `receiver_id`.
-3. [GET /sep12/customer — check status](/api-reference/customers/read-customer-requirements-or-status) with each `id`. Continue when both are `ACCEPTED`.
-
-Existing fixture references return the same IDs, so registration need not be repeated for every payment. Amina’s receiver record is already bound to a sandbox account alias. This API currently does not accept an arbitrary bank account number or mobile-wallet destination.
-
-## 3. Get the final price
-
-[POST /sep38/quote — get a firm quote](/api-reference/quotes/request-a-firm-sandbox-quote). Send the prefilled example:
-
-| Field | Meaning | Demo value |
-| --- | --- | --- |
-| `sell_asset` | Currency/token you send | Stellar Testnet USDC (includes its issuer) |
-| `buy_asset` | Currency the beneficiary receives | `iso4217:XOF` |
-| `sell_amount` | Amount you send | `0.2` |
-| `buy_delivery_method` | Current demo routing code | `PI_SPI` |
-| `context` | The payment protocol using this quote | `sep31` |
-
-Save the returned `id` as `quote_id`. Check `buy_amount` (100 XOF), fees (zero) and `expires_at`. Fund before expiry. You can go straight to this call: the optional price-discovery calls are not prerequisites for this fixed corridor.
-
-<Note>PI-SPI is the payment rail, not the beneficiary or a wallet. `PI_SPI` is the existing sandbox route code and must currently remain in the request. The destination is the account associated with `receiver_id`. Bank-account and mobile-wallet choices should describe the recipient destination; they must only be advertised when implemented and tested.</Note>
+XOF uses the currency-code format `iso4217:XOF`. These are [standard Stellar quote identifiers](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md#asset-identification-format).
 
 ## 4. Create the payment
 
-[POST /sep31/transactions — create a payout](/api-reference/payments/create-a-sandbox-payout-request). Replace `sender_id`, `receiver_id` and `quote_id` with your saved values. Keep amount `0.2` and submit once. Save the returned `id` as your payment ID.
+Open [Create a payment](/api-reference/payments/create-a-payment?playground=open).
 
-[GET /sep31/transactions/{id} — check readiness](/api-reference/payments/read-a-payout-and-its-status): wait for `pending_sender` and the returned Stellar destination and memo. Creating a payment does not transfer money.
+- Set `sender_id` from sender registration.
+- Set `receiver_id` from receiver registration.
+- Set `quote_id` from your quote.
+- Set `amount` to the quote's **sell_amount**.
 
-## 5. Send Testnet USDC
+Send and save the payment **id**. This creates the instruction; funds have not moved yet. Repeating the identical request returns the same payment.
 
-On the presenter’s Mac, from the configured `anchor-demo` directory:
+## 5. Fund the payment
 
-```sh
-node scripts/demo-payment.js --fund <payment-id>
-```
+Open [Fund a sandbox payment](/api-reference/sandbox/fund-a-sandbox-payment?playground=open), enter the payment ID and token, and click **Send**. No body is needed.
 
-The helper checks the destination, issuer, amount and expiry, signs locally and funds this exact payment. It does not create another quote or payment. Preserve its saved state: rerunning resumes the same payment, and a completed payment returns its receipt without sending again.
+The sponsor sends the USDC amount agreed in the quote. The response includes its Stellar transaction reference. If the call times out, retry the **same payment ID**; retries do not send twice.
 
-## 6. Track completion
+## 6. Check the result
 
-[GET /sep31/transactions/{id} — track the payout](/api-reference/payments/read-a-payout-and-its-status) with the same payment ID:
+Open [Read payment status](/api-reference/payments/read-payment-status?playground=open) with the payment ID. Repeat until `status` is **completed**.
 
-```text
-pending_sender → pending_receiver → completed
-```
+`completed` means PI-SPI confirmed the receiving account was credited. `external_transaction_id` is the payout reference. A Stellar transaction reference alone confirms funding, not delivery to the receiver.
 
-`completed` means PI-SPI confirmed the virtual payout. Show `amount_in`, `amount_out`, `stellar_transaction_id`, `external_transaction_id` and `completed_at`. A Stellar hash alone does not prove the beneficiary was credited.
+### View your transaction on Stellar Testnet
 
-## Optional calls: when would you use them?
+Open the URL returned in **`stellar_explorer_url`** inside the payment-status response, or **`stellarExplorerUrl`** in the funding response. It takes you directly to your transaction on Stellar Testnet—no hash copying or URL construction is needed.
 
-| Call | Question it answers | Needed for this demo? |
-| --- | --- | --- |
-| GET /sep38/info | Which currencies and delivery options are supported? | No; our corridor is already chosen |
-| GET /sep38/prices | What other currencies can I receive for this send currency, and at what estimated rates? | No; useful for a currency selector |
-| GET /sep38/price | For this pair and amount, approximately how much would arrive, including fees? | No; useful for a preview/calculator |
-| POST /sep38/quote | What final amounts and fees can I use for a payment before expiry? | **Yes**; returns the quote ID |
-| GET /sep38/quote/{quote_id} | What were the terms of my saved quote? | Optional recovery/readback |
+The link is `null` until a blockchain transaction hash is available. The explorer confirms the USDC transfer; the payment's `completed` status confirms the PI-SPI payout.
 
-The two estimate calls do not reserve a quote. Keep these standard Anchor Platform routes available for integrations; use the numbered path above for your first payment. [SEP-38 specification](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md).
+[View our completed example on Stellar Testnet](https://stellar.expert/explorer/testnet/tx/794b648515a9a8f7b05e97f536c934dbdcd5bddf07516ac0331c817ed3da7d4b).
 
-## If something goes wrong
+## Optional calls
 
-- Expired token: repeat authentication.
-- Expired quote before funding: request a new quote and create a new unfunded payment. Never duplicate an uncertain funded payment.
-- Unavailable API: restore the presenter’s local services/tunnel.
-- Tunnel header: use `ngrok-skip-browser-warning: 1` (prefilled).
+You do not need the discovery or preview calls for this walkthrough. They help an integrating application list currencies, compare rates or preview a conversion. **Get a payment quote** is the call that reserves the conversion used by a payment.
 
-The rate is illustrative (500 XOF per USDC). Testnet USDC and virtual XOF are separate transfers; the XOF comes from a prefunded simulator account. This is not real FX conversion or atomic settlement.
+## Troubleshooting
+
+- **401**: start a new session and replace your Bearer token.
+- **400**: check the receiver details, amount and delivery method.
+- **409**: follow the error message. If the quote expired, obtain a new one. If payment creation is still being reconciled, retry the same request.
+- **429**: the shared sandbox limit was reached. Retry later or contact Nostro.
+- **Connection error**: retry shortly; if the hosted sandbox remains unavailable, contact Nostro.
+
+The shared sponsor supports up to **50 funded payments**. Use IDs from your own responses rather than copying historical response examples.
