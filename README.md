@@ -4,7 +4,7 @@ Mintlify sources for the Stellar Anchor Platform / PI-SPI sandbox demonstration.
 
 - Live walkthrough: https://nostro.mintlify.site/quickstart
 - Hosted API: https://sandbox-api.nostro.finance
-- Runtime, tests, canonical contract and OVH deployment: https://github.com/laminesabodala/nostro-anchor-demo
+- Runtime, tests, contract and OVH deployment: https://github.com/laminesabodala/nostro-anchor-demo
 - `docs.json`: navigation and API playground configuration.
 - `openapi.json`: public SEP-10, SEP-12, SEP-31 and SEP-38 contract, plus sandbox helpers.
 - `quickstart.mdx`: browser-only payment walkthrough.
@@ -13,7 +13,7 @@ Mintlify sources for the Stellar Anchor Platform / PI-SPI sandbox demonstration.
 
 The hosted Mintlify editor is the publishing source. GitHub synchronization is not connected: its OAuth flow requested broader access than the approved documentation-only repository. Pushing here saves source changes but does not automatically publish them. Import the updated OpenAPI and changed pages into the hosted editor, review, and publish.
 
-This repository contains documentation only. Credentials, signing keys, bearer tokens and database backups must not be committed. The canonical OpenAPI source is `contracts/public-openapi.json` in the runtime repository; synchronize its `docs/` copy and this repository when changing the API.
+This repository contains documentation only. Credentials, signing keys, bearer tokens and database backups must not be committed. The OpenAPI source is `contracts/public-openapi.json` in the runtime repository; synchronize its `docs/` copy and this repository when changing the API.
 
 ## Verified OVH deployment — 20 October 2026
 
